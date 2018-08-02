@@ -8,9 +8,12 @@
 #ifndef GCODEPARSE_H_
 #define GCODEPARSE_H_
 
+#include <stdio.h>
 #include "MoTypes.h"
+#include "Commands.h"
 
 #define MAX_FLOAT_DIGITS 12
+#define BUFFER_SIZE 100
 
 typedef enum eParseState_t
 {
@@ -29,37 +32,25 @@ typedef enum eParseReturn_t
     PARSE_RETURN_LAST
 } eParseReturn;
 
-typedef enum eCommandType_t
-{
-    G_COMMAND,
-    M_COMMAND,
-    T_COMMAND,
-    SKIP_LINE,
-    ERROR,
-    CONTINUE,
-    UNKNOWN_COMMAND
-} eCommandType;
 
-typedef struct Command_t
-{
-    eCommandType    tGCommand;
-    uint16_t        dCommandNumber;
-    float           fSField;
-    float           fPField;
-    float           fXField;
-    float           fYField;
-    float           fZField;
-    float           fIField;
-    float           fJField;
-    float           fDField;
-    float           fHField;
-    float           fFField;
-    float           fRField;
-    float           fQField;
-    float           fEField;
-    float           fNField;
-} Command;
 
+typedef struct Parser_t
+{
+    char            pBuffer[BUFFER_SIZE];
+    eParseReturn    tParseReturn;
+    size_t          dContinueLoc;
+    Command         tCommand;
+    char            cField;
+    char            pParseNum[MAX_FLOAT_DIGITS];
+    size_t          dParseNumIndex;
+    eParseState     tParseState;
+} Parser;
+
+void ParserInit(Parser * rpParser);
+
+void ParseFile(Parser * rpParser, const char * rpFileName);
+
+void ParseFinish(Parser * rpParser);
 
 eParseReturn ParseNextInstruction(char * rpCharString, size_t rdSize, size_t * rdIterStart, Command * rpCommand, char * rpField, char * rpParseNum, size_t * rpParseNumIndex, eParseState * tParseState);
 

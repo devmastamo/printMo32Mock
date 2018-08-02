@@ -1,4 +1,5 @@
 #include "GCodeParse.h"
+#include "CommandHandler.h"
 #include "Commands.h"
 
 static bool AddToNum(char * rpParseNum, char rcNumCandidate)
@@ -254,4 +255,82 @@ eParseReturn ParseNextInstruction(char * rpCharString, size_t rdSize, size_t * r
         return PARSE_RETURN_DONE;
     }
 
+}
+
+void ParserInit(Parser * rpParser)
+{
+    rpParser->tParseReturn      = PARSE_RETURN_READ_MORE;
+    rpParser->dContinueLoc      = 0;
+    rpParser->cField            = ' ';
+    rpParser->dParseNumIndex    = 0;
+    rpParser->tParseState       = PARSE_STATE_START;
+    memset(&(rpParser->tCommand),  0, sizeof(Command));
+    memset(rpParser->pParseNum, 0, MAX_FLOAT_DIGITS);
+    memset(rpParser->pBuffer,   0, BUFFER_SIZE);
+}
+
+void ParseFile(Parser * rpParser, const char * rpFileName)
+{
+    FILE * fStream = fopen(rpFileName, "r");
+    size_t numCommandsProcessed = 0;
+    size_t retCode;
+
+    if(fStream != NULL)
+    {
+            
+
+        do
+        {
+            if((rpParser->tParseReturn) == PARSE_RETURN_READ_MORE)
+            {
+                retCode = fread(rpParser->pBuffer, 1, BUFFER_SIZE, fStream);
+                //printf("%s%s", buffer, "\r\n");
+            }
+            if(retCode > 0 && !feof(fStream))
+            {
+                while(GetQueueCount() == COMMAND_QUEUE_SIZE){};
+                rpParser->tParseReturn = ParseNextInstruction(rpParser->pBuffer, retCode, &(rpParser->dContinueLoc), &(rpParser->tCommand), &(rpParser->cField), rpParser->pParseNum, &(rpParser->dParseNumIndex), &(rpParser->tParseState));
+                if(rpParser->tParseReturn == PARSE_RETURN_DONE)
+                {
+                    printf("[%u]-%u S%f P%f X%f Y%f Z%f I%f J%f D%f H%f F%f R%f Q%f E%f N%f%s",
+                        rpParser->tCommand.tGCommand,
+                        rpParser->tCommand.dCommandNumber,
+                        rpParser->tCommand.fSField,
+                        rpParser->tCommand.fPField,
+                        rpParser->tCommand.fXField,
+                        rpParser->tCommand.fYField,
+                        rpParser->tCommand.fZField,
+                        rpParser->tCommand.fIField,
+                        rpParser->tCommand.fJField,
+                        rpParser->tCommand.fDField,
+                        rpParser->tCommand.fHField,
+                        rpParser->tCommand.fFField,
+                        rpParser->tCommand.fRField,
+                        rpParser->tCommand.fQField,
+                        rpParser->tCommand.fEField,
+                        rpParser->tCommand.fNField, 
+                        "\r\n");
+
+                    EnqueueCommand(&(rpParser->tCommand));
+                    memset(&(rpParser->tCommand), 0, sizeof(Command));
+                    rpParser->cField = ' ';
+                    memset(rpParser->pParseNum, 0, MAX_FLOAT_DIGITS);
+                    rpParser->dParseNumIndex = 0;
+
+                    numCommandsProcessed++;
+                }
+            }
+            else
+            {   
+                printf("ERROR IN FILE READ%s", "\r\n");
+                break;
+            }
+        } while(rpParser->tParseReturn != PARSE_RETURN_ERROR);
+        fclose(fStream);
+    }
+    else
+    {
+        printf("ERROR OPENING FILE! %d%s", errno, "\r\n");
+    }
+    printf("DONE - processed %zu commands!%s", numCommandsProcessed, "\r\n");
 }
